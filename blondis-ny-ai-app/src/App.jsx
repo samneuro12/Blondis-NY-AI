@@ -223,10 +223,20 @@ export default function HairRoutineRecommender() {
   const [catalogMap, setCatalogMap] = useState({
     "Bond-building mask (1×/week)": "Blondis NY Reparative Hair Mask",
   });
-  const mappedProducts = useMemo(
-    () => genericList.map((g) => ({ generic: g, mapped: catalogMap[g] || "" })),
-    [genericList, catalogMap]
-  );
+const mappedProducts = useMemo(() => {
+  // 1) auto-map from our generic label -> Blondis product (via catalog.js)
+  // 2) if you typed a manual override in the UI, prefer that (catalogMap[generic])
+  return Array.from(new Set([...rec.products])).map((generic) => {
+    const auto = mapGenericToBlondis(generic);           // {name, url} | null
+    const override = catalogMap[generic]?.trim();         // string | undefined
+
+    // display name preference: manual override > auto-mapped name > placeholder
+    const mappedName = override || auto?.name || "— (coming soon)";
+    const mappedUrl  = auto?.url || null;
+
+    return { generic, mappedName, mappedUrl };
+  });
+}, [rec.products, catalogMap]);
 
   const handleMulti = (name, value) => {
     const has = form.concerns.includes(value);
@@ -395,35 +405,43 @@ export default function HairRoutineRecommender() {
               ))}
             </div>
 
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold mb-1">
-                {t("Catalog Mapper (map to your brand items)", "ربط الفئات بمنتجات علامتك")}
-              </h3>
-              <div className="space-y-2">
-                {mappedProducts.map(({ generic, mapped }) => (
-                  <div key={generic} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
-                    <div className="text-xs text-gray-600">{generic}</div>
-                    <Input
-                      placeholder={t(
-                        "Type product name (e.g., Blondis NY Reparative Hair Mask)",
-                        "اكتب اسم المنتج"
-                      )}
-                      value={mapped}
-                      onChange={(e) => setCatalogMap({ ...catalogMap, [generic]: e.target.value })}
-                    />
-                    <button
-                      className="rounded-xl border px-3 py-2 text-xs"
-                      onClick={() => {
-                        const copy = `${generic} → ${catalogMap[generic] || "(not set)"}`;
-                        navigator.clipboard.writeText(copy);
-                      }}
-                    >
-                      {t("Copy mapping", "نسخ الربط")}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+<div className="mt-4">
+  <h3 className="text-sm font-semibold mb-1">
+    {t("Brand matches (auto-mapped to Blondis NY)", "مطابقات العلامة (ترابط تلقائي)")}
+  </h3>
+
+  <div className="space-y-2">
+    {mappedProducts.map(({ generic, mappedName, mappedUrl }) => (
+      <div key={generic} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+        {/* Generic need */}
+        <div className="text-xs text-gray-600">{generic}</div>
+
+        {/* Auto-mapped Blondis product (clickable if we have a link) */}
+        {mappedUrl ? (
+          <a
+            className="text-sm underline text-blue-600"
+            href={mappedUrl}
+            target="_blank"
+            rel="noreferrer"
+            title="View product"
+          >
+            {mappedName}
+          </a>
+        ) : (
+          <div className="text-sm text-gray-800">{mappedName}</div>
+        )}
+
+        {/* Optional manual override you can type per case */}
+        <Input
+          placeholder={t("override (optional)", "تعديل يدوي (اختياري)")}
+          value={catalogMap[generic] || ""}
+          onChange={(e) => setCatalogMap({ ...catalogMap, [generic]: e.target.value })}
+        />
+      </div>
+    ))}
+  </div>
+</div>
+
 
             {rec.notes.length > 0 && (
               <div className="mt-4">
